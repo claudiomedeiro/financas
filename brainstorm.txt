@@ -1,0 +1,95 @@
+============================================
+Menu Inicial:
+
+(C)onfigurações
+(E)xtrato
+(I)nserir
+(S)air
+
+Digite a opção (que está entre parêntesis):
+Escolha o tipo (R)ealizadas (P)lanejadas:   <-Quando a opção for (E)
+============================================
+
+
+    ============================================
+    Configurações:
+
+    (I)mportar .csv                             <-Fazer um bkp (bkp/AAAAMMDD_HHMMSS.bkp) do que tem no banco, limpar e inserir a nova tabela
+    (E)xportar .csv
+    E(x)cluir backups
+    (C)ontas e sub-contas
+    (V)oltar
+
+    Digite a opção (que está entre parêntesis):
+    ============================================
+
+
+        ============================================
+        Contas e sub-contas:
+
+        Seq Conta   Sub-conta      Saldo
+         01 BB      CDB         7.054,00
+         02 BB      Corrente      128,00
+            BB      Saldo       7.182,00
+         03 CEF     Corrente      103,58
+            CEF     Saldo         103,58
+         04 Inter   Corrente        3,17
+            Inter   Saldo           3,17
+
+        (E)ditar sub-conta
+        (A)crescentar sub-conta
+        (V)oltar
+
+        Digite a opção (que está entre parêntesis):
+        Digite o sequencial da sub-conta:           <-Quando a opção for (E)
+        ============================================
+
+
+    ================================================
+    Extrato:
+
+    Seq Data        Sub-conta       O quê     Quanto
+    ------------------------------------------------
+    01  25/02/2020  BB-CC           Seguro   -281,00
+    --  25/02/2020  BB-CC           Saldo   1.970,00
+    02  25/02/2020  CEF-013         CEB       -68,00
+    --  25/02/2020  CEF-013         Saldo     103,00
+    --  Saldo Acumulado até o dia           2.073,00
+    ------------------------------------------------
+    03  26/02/2020  Nubank-Gua      Mega      -20,00
+    --  26/02/2020  Nubank-Gua      Saldo   6.500,00
+    --  Saldo Acumulado até o dia           8.573,00
+
+    Página (A)nterior                               <-Só quando tiverem datas/valores anteriores
+    (P)róxima Página                                <-Só quando tiverem datas/valores posteriores
+    (E)ditar ocorrência
+    (V)oltar
+
+    Digite a opção (que está entre parêntesis):
+    Digite o sequencial da ocorrência:              <-Quando a opção for (E)
+    ================================================
+
+
+
+
+
+
+
+
+
+
+
+TODO:
+- Manter no SQLite
+- Criar uma função de exportação (para colar no xls)
+- Criar uma função de importação (para carregar do xls)
+- Criar uma função mais geral para a montagem da tela, com o que terá em todas as telas
+    - Armazenar o conteúdo específico e as opções possíveis em uma estrutura que faça o "roteamento" das opções
+
+
+
+dic_tela {
+    origem: 
+    , conteudo: 
+    , opcoes:
+}
