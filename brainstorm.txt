@@ -63,6 +63,7 @@ Escolha o tipo (R)ealizadas (P)lanejadas:   <-Quando a opção for (E)
     Página (A)nterior                               <-Só quando tiverem datas/valores anteriores
     (P)róxima Página                                <-Só quando tiverem datas/valores posteriores
     (E)ditar ocorrência
+    (I)nserir
     (V)oltar
 
     Digite a opção (que está entre parêntesis):
