@@ -8,30 +8,157 @@ de interação com ele, como algumas das funcionalidades abaixo relacionadas:
 - Alterar ocorrências
 - Visualizar extrato
 - Definir saldo de contas
+
+TODO: Repensar questão de chamada de método de montagem de página de maneira 
+encadeada, porque muitas instâncias consomem muita memória.
 """
 
 from os import system
 from time import sleep
 from datetime import datetime
 from sqlite3 import connect, Error
-# from io import open
-# from json import load
+from math import sqrt
+from sys import exit
 
 str_banco = "financas.db"
 str_separador = ";"
+dic_paginas = {}
+dic_larguras = {"SubConta": 0, "Oque": 0, "Valor": 0, "Detalhe": 0}
 
-def carrega_extrato():
+# As listas de apenas 01 elemento convertidas em tuplas, acrescentam uma 
+# vírgula que não é tolerada no comando 'SELECT', então fiz uma brincadeira 
+# ao concatenar uma 'data' inválida
+proporcao_aurea = "proporcao_aurea {}".format((1+sqrt(5))/2)
+
+# TODO: Colocar no arquivo de configurações e pensar funcionalidade para 
+# alterar pelo usuário. Pensar também em não permitir a definição do mínimo 
+# menor que a maior quantidade ṕara um dia/situação
+int_ocorrencias_por_pagina = 10
+
+
+def monta_paginas_extrato():
+    """TODO: Escrever arrazoado sobre o método
+    """
+    global int_ocorrencias_por_pagina
+    global dic_paginas
+
+    str_comando  = "SELECT "
+    str_comando += "    Data "
+    str_comando += "    ,COUNT(1) AS 'QtdeOcorrenciasDiaSituacao' "
+    str_comando += "    ,Situacao "
+    str_comando += "FROM "
+    str_comando += "    tb_ocorrencias "
+    str_comando += "GROUP BY "
+    str_comando += "    Data "
+    str_comando += "    ,Situacao "
+    str_comando += "ORDER BY "
+    str_comando += "    Situacao "
+    str_comando += "    ,Data "
+    vet_quantidades = executa_consulta(str_comando)
+
+    int_total = 0
+    int_pagina = 0
+    str_situacao = ""
+    for vet_quantidade in vet_quantidades:
+        int_total += int(vet_quantidade[1])
+
+        # Acrescenta à mesma página
+        if (int_total <= int_ocorrencias_por_pagina) and (str_situacao == vet_quantidade[2]):
+            dic_paginas[int_pagina]["Situacao"] = vet_quantidade[2]
+            dic_paginas[int_pagina]["Datas"].append(vet_quantidade[0])
+
+        # Nova página
+        else:
+            #Reinicia variáveis de página
+            int_total = int(vet_quantidade[1])
+            str_situacao = vet_quantidade[2]
+
+            int_pagina += 1
+            dic_paginas[int_pagina] = {}
+            dic_paginas[int_pagina]["Situacao"] = vet_quantidade[2]
+            dic_paginas[int_pagina]["Datas"] = []
+            dic_paginas[int_pagina]["Datas"].append(vet_quantidade[0])
+
+    return
+
+
+def formata_texto_posicoes(str_texto, int_tamanho, str_caracter_preencher, str_posicao="a"):
+    """Preenche determinado número de espaços (a)ntes ou (d)epois
+    """
+    str_antes = ""
+    str_depois = ""
+
+    if str_posicao == "a":
+        str_antes = str_caracter_preencher * (int_tamanho - len(str_texto))
+
+    elif str_posicao == "d":
+        str_depois = str_caracter_preencher * (int_tamanho - len(str_texto))
+
+    else:
+        pass
+
+    return(str_antes + str_texto + str_depois)
+
+
+def carrega_extrato(int_pagina=1):
     """
     TODO: Escrever arrazoado sobre o método
     TODO: Ajustar para apresentar primeiro o que é planejado e só depois o que é realizado
     TODO: Bolar paginação
     """
+
+    global dic_paginas
+    global proporcao_aurea
+
+    #Pega ocorrências específicas
+    str_comando  = "SELECT "
+    str_comando += "    Data "
+    str_comando += "    ,SubConta "
+    str_comando += "    ,Oque "
+    str_comando += "    ,Valor "
+    str_comando += "    ,Detalhe "
+    str_comando += "    ,Situacao "
+    str_comando += "FROM "
+    str_comando += "    tb_ocorrencias "
+    str_comando += "WHERE "
+    str_comando += "    Data in " + str(tuple(dic_paginas[int_pagina]["Datas"]+[proporcao_aurea])) + " "
+    str_comando += "    AND Situacao = '" + dic_paginas[int_pagina]["Situacao"] + "' "
+    str_comando += "ORDER BY "
+    str_comando += "    Data ASC "
+    str_comando += "    ,SubConta ASC "
+    str_comando += "    ,Valor DESC "
+    vet_ocorrencias = executa_consulta(str_comando)
+
+    for vet_ocorrencia in vet_ocorrencias:
+        if len(vet_ocorrencia[1]) > dic_larguras["SubConta"]:
+            dic_larguras["SubConta"] = len(vet_ocorrencia[1])
+
+        if len(vet_ocorrencia[2]) > dic_larguras["Oque"]:
+            dic_larguras["Oque"] = len(vet_ocorrencia[2])
+
+        if len(vet_ocorrencia[3]) > len("{:10.2f}".format(float(dic_larguras["Valor"]))):
+            dic_larguras["Valor"] = len(vet_ocorrencia[3])
+
+        if len(vet_ocorrencia[4]) > dic_larguras["Detalhe"]:
+            dic_larguras["Detalhe"] = len(vet_ocorrencia[4])
+
+    # print("\ndic_larguras: {}".format(dic_larguras))
+    # sleep(30)
+
+    # Converte ocorrências em dicionário por data
+    dic_ocorrencias = {}
+    for vet_ocorrencia in vet_ocorrencias:
+        try:
+            dic_ocorrencias[vet_ocorrencia[0]].append(vet_ocorrencia[1:])
+        except:
+            dic_ocorrencias[vet_ocorrencia[0]] = []
+            dic_ocorrencias[vet_ocorrencia[0]].append(vet_ocorrencia[1:])
+
     # Consulta os saldos finais das subcontas por dia
     str_comando  = "SELECT "
     str_comando += "        tb_aux_ocorrencias_01.Data "
     str_comando += "        ,tb_aux_ocorrencias_01.SubConta "
     str_comando += "        ,SUM(tb_aux_ocorrencias_02.Valor) AS 'Valor' "
-    str_comando += "        ,tb_aux_ocorrencias_01.Situacao "
     str_comando += "FROM "
     str_comando += "    ( "
     str_comando += "    SELECT "
@@ -65,68 +192,58 @@ def carrega_extrato():
     str_comando += "    AND tb_aux_ocorrencias_01.SubConta = tb_aux_ocorrencias_02.SubConta  "
     str_comando += "    AND tb_aux_ocorrencias_01.Situacao = tb_aux_ocorrencias_02.Situacao "
     str_comando += "WHERE "
-    # TODO: A cláusua abaixo precisa ser repensada para ter condições de 
-    # mostrar todos os lançamentos
-    str_comando += "        tb_aux_ocorrencias_01.Situacao = 'Planejado' " 
+    str_comando += "    tb_aux_ocorrencias_01.Data in " + str(tuple(dic_paginas[int_pagina]["Datas"]+[proporcao_aurea])) + " "
+    str_comando += "    AND tb_aux_ocorrencias_01.Situacao = '" + dic_paginas[int_pagina]["Situacao"] + "' "
     str_comando += "GROUP BY "
     str_comando += "        tb_aux_ocorrencias_01.Data "
     str_comando += "        ,tb_aux_ocorrencias_01.SubConta "
-    str_comando += "        ,tb_aux_ocorrencias_01.Situacao "
     vet_saldos = executa_consulta(str_comando)
 
-    # Identifica as datas para as quais tem ocorrências
-    vet_datas = []
+    # Converte saldos por dia/subconta em dicionário
+    dic_saldos = {}
     for vet_saldo in vet_saldos:
-        vet_datas.append(vet_saldo[0])
-    
-    vet_datas = list(set(vet_datas))
-    vet_datas.sort()
+        try:
+            dic_saldos[vet_saldo[0]].append(vet_saldo[1:])
+        except:
+            dic_saldos[vet_saldo[0]] = []
+            dic_saldos[vet_saldo[0]].append(vet_saldo[1:])
 
     str_texto_tela = ""
+    int_cont = 0
 
-    # Para cada com ocorrências, imprime
-    for str_data in vet_datas:
-        # Consulta todos os registros de ocorrênicas para a data.
-        str_comando  = "SELECT "
-        str_comando += "    Data "
-        str_comando += "    ,SubConta "
-        str_comando += "    ,Oque "
-        str_comando += "    ,Valor "
-        str_comando += "    ,Detalhe "
-        str_comando += "    ,Situacao "
-        str_comando += "FROM "
-        str_comando += "    tb_ocorrencias "
-        str_comando += "WHERE "
-        str_comando += "    Data = " + "'" + str_data + "'"
-        str_comando += "ORDER BY "
-        str_comando += "    Situacao ASC "
-        str_comando += "    ,SubConta "
-        # str_comando += "    ,Data ASC "
-        str_comando += "    ,Valor DESC "
-        vet_registros = executa_consulta(str_comando)
+    for str_data in dic_saldos.keys():
+        str_texto_tela += "\n" + formata_texto_posicoes("-", 70, "-", "d")
 
-        int_cont = 0
-        str_subconta = "xxx"
-        str_texto_tela += "\n" + "-"*50
-        for vet_registro in vet_registros:
-            if str_subconta != vet_registro[1]:
-                str_subconta = vet_registro[1]
-                str_texto_tela += "\n{}\t{}\t{}\t{}\t{}".format("--", 
-                                                                vet_registro[0], 
-                                                                vet_registro[1], 
-                                                                "Saldo subconta", 
-                                                                "vet_saldos[???]") # TODO: Ajustar para apresentar o saldo da conta
+        for tup_subconta in dic_saldos[str_data]:
+            str_subconta = tup_subconta[0]
+            str_subconta_imprimir = formata_texto_posicoes(str_subconta, dic_larguras["SubConta"], " ", "d")
+            str_saldo_subconta = tup_subconta[1]
 
+            str_tracinhos = formata_texto_posicoes("-", len(str(int_ocorrencias_por_pagina)), "-", "d")
+            str_saldo_subconta_constante = formata_texto_posicoes("Saldo subconta", dic_larguras["Oque"], " ", "d")
 
-            int_cont += 1
-            str_texto_tela += "\n{}\t{}\t{}\t{}\t{}".format(int_cont, 
-                                                vet_registro[0], 
-                                                vet_registro[1], 
-                                                vet_registro[2], 
-                                                vet_registro[3])
-            
-        
-        # TODO: Inserir também o saldo da conta
+            # Imprimir saldo da subconta
+            str_texto_tela += "\n{}  {}  {}  {}  {:10.2f}".format(str_tracinhos
+                                                            ,str_data
+                                                            ,str_subconta_imprimir
+                                                            ,str_saldo_subconta_constante
+                                                            ,float(str_saldo_subconta))
+
+            # Imprime ocorrencias da subconta
+            for tup_ocorrencia in dic_ocorrencias[str_data]:
+                if tup_ocorrencia[0] == str_subconta:
+                    # str_o_que = tup_ocorrencia[1]
+                    str_o_que = formata_texto_posicoes(tup_ocorrencia[1], dic_larguras["Oque"], " ", "d")
+                    str_valor = tup_ocorrencia[2]
+
+                    int_cont += 1
+                    str_cont = formata_texto_posicoes(str(int_cont), len(str(int_ocorrencias_por_pagina)), "0", "a")
+
+                    str_texto_tela += "\n{}  {}  {}  {}  {:10.2f}".format(str_cont
+                                                                    ,str_data
+                                                                    ,str_subconta_imprimir
+                                                                    ,str_o_que
+                                                                    ,float(str_valor))
 
     return(str_texto_tela)
 
@@ -164,8 +281,6 @@ def grava_log(tup_log, bol_parar=False):
     """
     Recebe uma tupla com dois elementos, sendo o primeiro o tipo (info, ERRO, etc)
     """
-    from time import sleep
-
     if tup_log[0] == "ERRO":
         str_na_cor = "\x1b[31m{}\x1b[0m".format(tup_log[0])
     elif tup_log[0] == "info":
@@ -175,6 +290,9 @@ def grava_log(tup_log, bol_parar=False):
 
     str_mensagem = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\t" + str_na_cor + "\t" + tup_log[1] + "\n"
     print(str_mensagem)
+    
+    # if tup_log[0] == "ERRO":
+    #     sleep(10)
 
     str_mensagem = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\t" + tup_log[0] + "\t" + tup_log[1] + "\n"
     str_arquivo_log = "saidas/" + datetime.now().strftime("%Y%m%d") + "_processamento.log"
@@ -203,14 +321,10 @@ def importa_csv(str_nome_arquivo, str_tabela, vet_schema):
     #Se a tabela ainda não existir vai ser criada
     cria_tabela(str_tabela, vet_schema)
 
-    #Cria cópia de segurança dos dados carregados na base de ocorrências
-    # TODO
-
-    # #Apaga registros correspondentes a cargas anteriores para a tabela
-    # exclui_registros_anteriores(str_tabela)
+    # TODO: Cria cópia de segurança dos dados carregados na base de ocorrências
+    # TODO: Apaga registros correspondentes a cargas anteriores para a tabela
 
     vet_arquivo = abre_arquivo(str_nome_arquivo)
-
 
     for int_pos in range (1, len(vet_arquivo), 1):
         vet_campos = vet_arquivo[int_pos].split(str_separador)
@@ -226,16 +340,6 @@ def importa_csv(str_nome_arquivo, str_tabela, vet_schema):
             vet_campos[4] = vet_campos[4].replace(".","").replace(",",".")
 
         insere_registro_no_banco(str_tabela, vet_schema, vet_campos)
-
-
-def exclui_registros_anteriores(str_tabela, sOutrasClausulas=""):
-    """Recebe o nome da tabela e exclui todos os seus registros.
-    """
-    str_comando="DELETE FROM " + str_tabela + " WHERE AnoMes = '" + sAnoMes + "' " + sOutrasClausulas + " "
-    str_mensagem_ok = "Apagados registros anteriores da tabela '" + str_tabela + "' onde AnoMes = '" + sAnoMes + "' "
-    str_mensagem_erro = "Nao foram excluidos os registros anteriores da tabela '" + str_tabela + "' onde AnoMes = '" + sAnoMes + "' "
-    executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro)
-    return
 
 
 def cria_tabela(str_tabela, vet_campos, vet_tipos=[]):
@@ -254,6 +358,7 @@ def cria_tabela(str_tabela, vet_campos, vet_tipos=[]):
 
         if int_cont < len(vet_campos)-1:
             str_comando += ","
+
     str_comando += "\n)"
 
     str_mensagem_ok = "Tabela '{}' criada.".format(str_tabela)
@@ -297,18 +402,17 @@ def insere_registro_no_banco(str_tabela, vet_campos, vet_valores):
     return
 
 def executa_consulta(str_comando):
-    """
-    Recebe um comando SQL de consulta e o nome do banco, executa e retorna um vetor com os valores encontrados
+    """Recebe um comando SQL de consulta e o nome do banco, executa e retorna um vetor com os valores encontrados
     """  
     str_mensagem_ok = "Valores do select lidos para a memoria "
-    str_mensagem_erro = "Nao foi possivel executar a consulta " + str_comando[:80] + "..."  
-    vet_registros=executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro)
+    # str_mensagem_erro = "Nao foi possivel executar a consulta " + str_comando[:80] + "..."  
+    str_mensagem_erro = "Nao foi possivel executar a consulta " + str_comando
+    vet_registros = executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro)
     return(vet_registros)
 
 
 def executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro):
-    """
-    Recebe um comando e o executa no banco de dados
+    """Recebe um comando e o executa no banco de dados
     """
     global str_banco
 
@@ -330,7 +434,7 @@ def executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro):
             conn.commit()
 
         conn.close()
-        # grava_log(("info", str_mensagem_ok))
+
     except Error as error:
         grava_log(("ERRO", str_mensagem_erro + ": " + str(error)))
     finally:
@@ -341,56 +445,7 @@ def executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro):
     return(vet_registros)
 
 
-# def exporta_tabela_para_csv(vetTabela, vet_campos, str_arquivoSaida):
-#     """
-#     Recebe um vetor de dados, outro dos titulos dos campos e o nome do arquivo de saida
-#     e gera um arquivo de saida, separando os campos por pipe
-#     """
-#     sLinhas = u""
-#     for int_cont in range(len(vet_campos)):
-#         sLinhas+=vet_campos[int_cont]
-#         if int_cont < len(vet_campos)-1:
-#             sLinhas+="|"
-
-#     sLinhas+="\n"
-
-#     for vetLinha in vetTabela:
-#         for int_cont in range (len(vetLinha)):
-#             if type(vetLinha[int_cont]) == float:
-#                 sLinhas += str(vetLinha[int_cont]).replace(".", ",")
-#             else:
-#                 sLinhas += str(vetLinha[int_cont])
-#             if int_cont < len(vet_campos)-1:
-#                 sLinhas+="|"
-#             else:
-#                 sLinhas+="\n"
-
-#     escreveArquivo(str_arquivoSaida, sLinhas)
-
-
-# def escreveArquivo(sNome, sConteudo, bSobrescreve=True):
-#     """
-#     Recebe um nome de arquivo e o conteudo a ser escrito e escreve no arquivo
-#     Observacao: O default eh sobrescrever o arquivo, se quiser add, tem que passar o parametro bSobrescreve=False
-#     """
-#     sArquvo = "saidas/"+sNome
-#     bArquivoExiste = False
-#     if bSobrescreve:
-#         sModo = "w"
-#     else:
-#         sModo = "a"
-
-#     try:
-#         with open("saidas/"+sNome, sModo) as fil_arquivo:     #Aberto com with, nao precisa do close
-#             fil_arquivo.write(sConteudo)
-#             fil_arquivo.close()
-#             grava_log(("info", "Arquivo '" + "saidas/" + sNome + "' gravado com sucesso "))
-
-#     except IOError:
-#         grava_log(("ERRO", "Nao foi possivel gravar no arquivo '" + "saidas/" + sNome + "'"))
-
-
-def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo=""):
+def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
     """Monta a estrutura geral da 'janela' de interface
 
     - str_conteudo: preenchido com o que deve 'rechear' o 'miolo' da tela
@@ -411,10 +466,24 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo=""):
         
         #Invoca cada uma das opções previstas
         else:
-            if dic_opcoes[str_escolha] == "menu_iniciar_sair":
+            # Paginação para menos
+            if dic_opcoes[str_escolha] == "extrato_menos_1":
+                int_pagina -= 1
+                dic_opcoes[str_escolha] = "extrato"
+
+            # Paginação para mais
+            if dic_opcoes[str_escolha] == "extrato_mais_1":
+                int_pagina += 1
+                dic_opcoes[str_escolha] = "extrato"
+
+            # Todas as opções válidas
+            if dic_opcoes[str_escolha] == "sair":
                 print("\nObrigado por usar o aplicativo! Até logo!")
                 sleep(2)
-                break
+                exit()
+
+            elif dic_opcoes[str_escolha] == "voltar_extrato":
+                menu_iniciar()
 
             elif dic_opcoes[str_escolha] == "menu_iniciar_configuracoes":
                 str_configuracoes  = "Configurações:\n\n"
@@ -444,23 +513,45 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo=""):
             elif dic_opcoes[str_escolha] == "voltar":
                 break
 
-            elif dic_opcoes[str_escolha] == "menu_iniciar_extrato":
-                str_extrato = carrega_extrato()         #TODO: montar extrato/paginação
+            elif dic_opcoes[str_escolha] == "extrato":
+                # Só monta as páginas na primeira vez que entra em extrato
+                if int_pagina == 0:
+                    monta_paginas_extrato()
+                    int_pagina += 1
 
-                str_extrato += "Página (A)nterior\n"    #TODO: Só quando tiverem datas/valores anteriores
-                str_extrato += "(P)róxima Página\n"     #TODO: Só quando tiverem datas/valores posteriores
+                dic_opcoes_proximo = {"A": "extrato_menos_1"
+                                    , "P": "extrato_mais_1"
+                                    , "E": "extrato_editar_ocorrencia"
+                                    , "I": "inserir_ocorrencia"
+                                    , "V": "voltar_extrato"}
+
+                if int_pagina > 0:
+                    str_extrato = carrega_extrato(int_pagina)
+
+                str_extrato += "\n\n"
+
+                # Só exibe a opção se tiver páginas antes
+                if int_pagina > 1:
+                    str_extrato += "Página (A)nterior\n"    #TODO: Só quando tiverem datas/valores anteriores
+
+                else:
+                    dic_opcoes_proximo.pop("A")
+
+                # Só exibe a opção se tiver páginas depois
+                if int_pagina < len(dic_paginas.keys()):
+                    str_extrato += "(P)róxima Página\n"     #TODO: Só quando tiverem datas/valores posteriores
+
+                else:
+                    dic_opcoes_proximo.pop("P")
+
                 str_extrato += "(E)ditar ocorrência\n"  #TODO: Só quando tiverem ocorrências sendo exibidas
                 str_extrato += "(I)nserir\n"
                 str_extrato += "(V)oltar\n"
 
-                monta_tela(str_extrato, { "A": "extrato_pagina_anterior"
-                                        , "P": "extrato_proxima_pagina"
-                                        , "E": "extrato_editar_ocorrencia"
-                                        , "I": "inserir_ocorrencia"
-                                        , "V": "voltar"}, "Extrato:\n\n")
+                monta_tela(str_extrato, dic_opcoes_proximo, "Extrato: {}\n".format(dic_paginas[int_pagina]["Situacao"]), int_pagina)
 
             elif dic_opcoes[str_escolha] == "configuracoes_contas_e_subcontas":
-                print("")                                           #TODO: montar relação de contas e sub-contas
+                #TODO: montar relação de contas e sub-contas
 
                 str_contas_e_subcontas  = "(E)ditar sub-conta\n"    #TODO: Só quando tiverem contas/sub-contas
                 str_contas_e_subcontas += "(A)crescentar sub-conta\n"
@@ -471,18 +562,21 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo=""):
                                                     , "V": "voltar"}, "Contas e sub-contas:\n\n")
 
             else:
+                #TODO: Avaliar se depois de todas as opções implementadas,  é meso necessário manter este else
                 print("\nFuncionalidade '{} - {}' ainda não implementada".format(str_escolha, dic_opcoes[str_escolha]))
                 sleep(2)
-                pass                                    #TODO: Avaliar se depois de todas as opções implementadas,  é meso necessário manter este else
 
 
-if __name__ == "__main__":
+def menu_iniciar():
     str_menu_inicial  = "Menu Inicial:\n\n"
     str_menu_inicial += "(C)onfigurações\n"
     str_menu_inicial += "(E)xtrato\n"
     str_menu_inicial += "(I)nserir\n"
     str_menu_inicial += "(S)air\n"
     monta_tela(str_menu_inicial, {    "C": "menu_iniciar_configuracoes"
-                                    , "E": "menu_iniciar_extrato"
+                                    , "E": "extrato"
                                     , "I": "inserir_ocorrencia"
-                                    , "S": "menu_iniciar_sair"})
+                                    , "S": "sair"})
+
+if __name__ == "__main__":
+    menu_iniciar()
