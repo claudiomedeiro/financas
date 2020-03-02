@@ -217,7 +217,6 @@ def carrega_extrato(int_pagina=1):
 
     int_tracos = len(str(int_ocorrencias_por_pagina))+1 + 10 + dic_larguras["SubConta"] + dic_larguras["Oque"] + 10 + 8
 
-    # flo_geral_acumulado = 0
     for str_data in dic_saldos.keys():
         str_texto_tela += "\n" + formata_texto_posicoes("-", int_tracos, "-", "d")
 
@@ -225,17 +224,9 @@ def carrega_extrato(int_pagina=1):
             str_subconta = tup_subconta[0]
             str_subconta_imprimir = formata_texto_posicoes(str_subconta, dic_larguras["SubConta"], " ", "d")
             str_saldo_subconta = tup_subconta[1]
-            # flo_geral_acumulado += float(str_saldo_subconta)
 
             str_tracinhos = formata_texto_posicoes("-", len(str(int_ocorrencias_por_pagina))+1, "-", "d")
             str_saldo_subconta_constante = formata_texto_posicoes("Saldo subconta", dic_larguras["Oque"], " ", "d")
-
-            # # Imprimir saldo da subconta
-            # str_texto_tela += "\n{}  {}  {}  {}  {:10.2f}".format(str_tracinhos
-            #                                                 ,str_data
-            #                                                 ,str_subconta_imprimir
-            #                                                 ,str_saldo_subconta_constante
-            #                                                 ,float(str_saldo_subconta))
 
             # Imprime ocorrencias da subconta
             for tup_ocorrencia in dic_ocorrencias[str_data]:
@@ -269,10 +260,6 @@ def carrega_extrato(int_pagina=1):
                                                             )
 
             str_texto_tela += "\n"
-
-        # # # Imprimir saldo geral acumulado
-        # str_texto_tela += "\n{}  {:10.2f}".format(formata_texto_posicoes("Saldo Geral Acumulado", int_tracos - 12, " ", "d")
-        #                                                 ,flo_geral_acumulado)
 
     return(str_texto_tela)
 
