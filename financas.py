@@ -104,7 +104,6 @@ def carrega_extrato(int_pagina=1):
     """
     TODO: Escrever arrazoado sobre o método
     TODO: Ajustar para apresentar primeiro o que é planejado e só depois o que é realizado
-    TODO: Bolar paginação
     """
 
     global dic_paginas
@@ -141,9 +140,6 @@ def carrega_extrato(int_pagina=1):
 
         if len(vet_ocorrencia[4]) > dic_larguras["Detalhe"]:
             dic_larguras["Detalhe"] = len(vet_ocorrencia[4])
-
-    # print("\ndic_larguras: {}".format(dic_larguras))
-    # sleep(30)
 
     # Converte ocorrências em dicionário por data
     dic_ocorrencias = {}
@@ -211,39 +207,59 @@ def carrega_extrato(int_pagina=1):
     str_texto_tela = ""
     int_cont = 0
 
+    if len(dic_saldos.keys()) > 0:
+        # Imprimir cabecalho das colunas
+        str_texto_tela += "\n{}  {}  {}  {}  {}".format(formata_texto_posicoes("Seq", len(str(int_ocorrencias_por_pagina))+1, " ", "d")
+                                                        ,formata_texto_posicoes("Data", 10, " ", "d")
+                                                        ,formata_texto_posicoes("Sub-Conta", dic_larguras["SubConta"], " ", "d")
+                                                        ,formata_texto_posicoes("O quê", dic_larguras["Oque"], " ", "d")
+                                                        ,formata_texto_posicoes("Quanto", 10, " ", "a"))
+
+    int_tracos = len(str(int_ocorrencias_por_pagina))+1 + 10 + dic_larguras["SubConta"] + dic_larguras["Oque"] + 10 + 8
+
     for str_data in dic_saldos.keys():
-        str_texto_tela += "\n" + formata_texto_posicoes("-", 70, "-", "d")
+        str_texto_tela += "\n" + formata_texto_posicoes("-", int_tracos, "-", "d")
 
         for tup_subconta in dic_saldos[str_data]:
             str_subconta = tup_subconta[0]
             str_subconta_imprimir = formata_texto_posicoes(str_subconta, dic_larguras["SubConta"], " ", "d")
             str_saldo_subconta = tup_subconta[1]
 
-            str_tracinhos = formata_texto_posicoes("-", len(str(int_ocorrencias_por_pagina)), "-", "d")
+            str_tracinhos = formata_texto_posicoes("-", len(str(int_ocorrencias_por_pagina))+1, "-", "d")
             str_saldo_subconta_constante = formata_texto_posicoes("Saldo subconta", dic_larguras["Oque"], " ", "d")
-
-            # Imprimir saldo da subconta
-            str_texto_tela += "\n{}  {}  {}  {}  {:10.2f}".format(str_tracinhos
-                                                            ,str_data
-                                                            ,str_subconta_imprimir
-                                                            ,str_saldo_subconta_constante
-                                                            ,float(str_saldo_subconta))
 
             # Imprime ocorrencias da subconta
             for tup_ocorrencia in dic_ocorrencias[str_data]:
                 if tup_ocorrencia[0] == str_subconta:
-                    # str_o_que = tup_ocorrencia[1]
                     str_o_que = formata_texto_posicoes(tup_ocorrencia[1], dic_larguras["Oque"], " ", "d")
                     str_valor = tup_ocorrencia[2]
 
                     int_cont += 1
-                    str_cont = formata_texto_posicoes(str(int_cont), len(str(int_ocorrencias_por_pagina)), "0", "a")
+                    str_cont = formata_texto_posicoes(str(int_cont), len(str(int_ocorrencias_por_pagina))+1, "0", "a")
 
                     str_texto_tela += "\n{}  {}  {}  {}  {:10.2f}".format(str_cont
                                                                     ,str_data
                                                                     ,str_subconta_imprimir
                                                                     ,str_o_que
                                                                     ,float(str_valor))
+
+            # Define cor 'vermelha' para saldo de subconta negativo
+            if float(str_saldo_subconta) < 0:
+                str_na_cor = "\x1b[31m"
+            else:
+                str_na_cor = "\x1b[0m"
+
+            # Imprimir saldo da subconta
+            str_texto_tela += "\n{}  {}  {}  {}  {}{:10.2f}{}".format(str_tracinhos
+                                                            ,str_data
+                                                            ,str_subconta_imprimir
+                                                            ,str_saldo_subconta_constante
+                                                            ,str_na_cor
+                                                            ,float(str_saldo_subconta)
+                                                            ,"\x1b[0m"
+                                                            )
+
+            str_texto_tela += "\n"
 
     return(str_texto_tela)
 
@@ -291,9 +307,6 @@ def grava_log(tup_log, bol_parar=False):
     str_mensagem = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\t" + str_na_cor + "\t" + tup_log[1] + "\n"
     print(str_mensagem)
     
-    # if tup_log[0] == "ERRO":
-    #     sleep(10)
-
     str_mensagem = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\t" + tup_log[0] + "\t" + tup_log[1] + "\n"
     str_arquivo_log = "saidas/" + datetime.now().strftime("%Y%m%d") + "_processamento.log"
 
@@ -313,7 +326,14 @@ def grava_log(tup_log, bol_parar=False):
 
 
 def importa_csv(str_nome_arquivo, str_tabela, vet_schema):
-    """Acrescenta o conteudo de 'vet_arquivo' em uma estrutura de tabela definida
+    """Acrescenta o conteudo de 'vet_arquivo' em uma estrutura de tabela definida:
+
+    O leiaute do arquivo de entrada deve ser como segue:
+
+    Data;Oque;Detalhe;SubConta;Valor;Situacao
+    28/02/2020;Saldo Conta BRB;;BRB;1.385,99;Planejado
+    28/02/2020;Saldo Conta Nubank;;Nubank;541,79;Planejado
+    28/02/2020;Saldo Conta Santander;;Santander;308,41;REALIZADO
     """  
     
     global str_separador
@@ -405,7 +425,6 @@ def executa_consulta(str_comando):
     """Recebe um comando SQL de consulta e o nome do banco, executa e retorna um vetor com os valores encontrados
     """  
     str_mensagem_ok = "Valores do select lidos para a memoria "
-    # str_mensagem_erro = "Nao foi possivel executar a consulta " + str_comando[:80] + "..."  
     str_mensagem_erro = "Nao foi possivel executar a consulta " + str_comando
     vet_registros = executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro)
     return(vet_registros)
@@ -532,14 +551,14 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
 
                 # Só exibe a opção se tiver páginas antes
                 if int_pagina > 1:
-                    str_extrato += "Página (A)nterior\n"    #TODO: Só quando tiverem datas/valores anteriores
+                    str_extrato += "Página (A)nterior\n"
 
                 else:
                     dic_opcoes_proximo.pop("A")
 
                 # Só exibe a opção se tiver páginas depois
                 if int_pagina < len(dic_paginas.keys()):
-                    str_extrato += "(P)róxima Página\n"     #TODO: Só quando tiverem datas/valores posteriores
+                    str_extrato += "(P)róxima Página\n"
 
                 else:
                     dic_opcoes_proximo.pop("P")
