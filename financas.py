@@ -19,6 +19,7 @@ from datetime import datetime
 from sqlite3 import connect, Error
 from math import sqrt
 from sys import exit
+import xlrd         # para manipular planilhas excel
 
 str_banco = "financas.db"
 str_separador = ";"
@@ -108,6 +109,8 @@ def carrega_extrato(int_pagina=1):
 
     global dic_paginas
     global proporcao_aurea
+
+    # TODO: Excluir do select os valores zerados, que normalmente são saldos de contas
 
     #Pega ocorrências específicas
     str_comando  = "SELECT "
@@ -271,11 +274,67 @@ def string_data_em_iso8601(str_data):
     return(str_data[6:10] + "-" + str_data[3:5] + "-" + str_data[:2])
 
 
+# def abre_arquivo(str_arquivo):
+#     """Recebe o nome do arquivo, abre-o, e coloca em um vetor em que cada
+#     posição é uma linha.
+#
+#     Retorna no vetor e o último elemento tem um '\n' que depois precisa ser
+#     tirado em cada processo específico.
+#     """
+#
+#     str_arquivo = str(str_arquivo)
+#     vet_linhas = []
+#
+#     try:
+#         with open(str_arquivo, 'r') as fil_arquivo:
+#             vet_linhas = fil_arquivo.readlines()
+#             fil_arquivo.close()
+#
+#     except IOError:
+#         grava_log(("ERRO", "Problemas ao tentar ler o arquivo '" + str_arquivo + "'"))
+#
+#     return vet_linhas
+
+def abre_planilha(str_arquivo, str_aba):
+    """
+    Converte os dados da planilha em uma lista bidimensional, em que cada posição é uma linha.
+
+    :return vet_linhas: Lista contendo cada linha do arquivo de entrada em uma posição
+    """
+    # str_arquivo = download_planilha()
+    workbook = xlrd.open_workbook(str_arquivo)
+    worksheet = workbook.sheet_by_name(str_aba)
+    # TODO: permitir que o operador escolha a planilha e a aba
+
+    vet_linhas = []
+    for int_cont_rows in range(1, worksheet.nrows):
+        vet_valores = []
+        for int_cont_cols in range(worksheet.ncols):
+
+            if worksheet.row(int_cont_rows)[int_cont_cols].ctype == 3:
+                # Converte data em formato AAAA-MM-DD
+                # flo_valor = worksheet.row(int_cont_rows)[int_cont_cols].value
+                wrongValue = worksheet.row(int_cont_rows)[int_cont_cols].value
+                workbook_datemode = workbook.datemode
+                tup_data = xlrd.xldate_as_tuple(wrongValue, workbook_datemode)
+                str_valor = datetime(tup_data[0], tup_data[1], tup_data[2])
+                str_valor = "{}".format(str_valor)
+            else:
+                str_valor = worksheet.row(int_cont_rows)[int_cont_cols].value
+
+            vet_valores.append(str_valor)
+
+        vet_linhas.append(vet_valores)
+
+    # print("def abre_planilha vet_linhas: {}".format(vet_linhas))
+    return(vet_linhas)
+
+
 def abre_arquivo(str_arquivo):
-    """Recebe o nome do arquivo, abre-o, e coloca em um vetor em que cada 
+    """Recebe o nome do arquivo, abre-o, e coloca em um vetor em que cada
     posição é uma linha.
-    
-    Retorna no vetor e o último elemento tem um '\n' que depois precisa ser 
+
+    Retorna no vetor e o último elemento tem um '\n' que depois precisa ser
     tirado em cada processo específico.
     """
 
@@ -290,6 +349,7 @@ def abre_arquivo(str_arquivo):
     except IOError:
         grava_log(("ERRO", "Problemas ao tentar ler o arquivo '" + str_arquivo + "'"))
 
+    print("def abre_arquivo vet_linhas: {}".format(vet_linhas))
     return vet_linhas
 
 
@@ -306,7 +366,7 @@ def grava_log(tup_log, bol_parar=False):
 
     str_mensagem = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\t" + str_na_cor + "\t" + tup_log[1] + "\n"
     print(str_mensagem)
-    
+
     str_mensagem = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\t" + tup_log[0] + "\t" + tup_log[1] + "\n"
     str_arquivo_log = "saidas/" + datetime.now().strftime("%Y%m%d") + "_processamento.log"
 
@@ -315,7 +375,7 @@ def grava_log(tup_log, bol_parar=False):
             with open(str_arquivo_log, 'a') as fLog:
                     fLog.write(str_mensagem)
                     fLog.close()
-                    
+
                     if tup_log[0] == "ERRO":
                         sleep(2)
         except IOError:
@@ -325,7 +385,7 @@ def grava_log(tup_log, bol_parar=False):
     return
 
 
-def importa_csv(str_nome_arquivo, str_tabela, vet_schema):
+def importa_dados_planilha(str_nome_arquivo, str_nome_planilha, str_tabela, vet_schema):
     """Acrescenta o conteudo de 'vet_arquivo' em uma estrutura de tabela definida:
 
     O leiaute do arquivo de entrada deve ser como segue:
@@ -335,31 +395,20 @@ def importa_csv(str_nome_arquivo, str_tabela, vet_schema):
     28/02/2020;Saldo Conta Nubank;;Nubank;541,79;Planejado
     28/02/2020;Saldo Conta Santander;;Santander;308,41;REALIZADO
     """  
-    
-    global str_separador
-
     #Se a tabela ainda não existir vai ser criada
     cria_tabela(str_tabela, vet_schema)
 
     # TODO: Cria cópia de segurança dos dados carregados na base de ocorrências
-    # TODO: Apaga registros correspondentes a cargas anteriores para a tabela
 
-    vet_arquivo = abre_arquivo(str_nome_arquivo)
+    # Apaga registros correspondentes a cargas anteriores para a tabela
+    str_comando = "DELETE FROM {}".format(str_tabela)
+    executa_comando_banco(str_comando, str_mensagem_ok="Todos os registros do banco de ocorrências foram apagados.", str_mensagem_erro="Não foi possível excluir os registros do banco de ocorrências.")
 
-    for int_pos in range (1, len(vet_arquivo), 1):
-        vet_campos = vet_arquivo[int_pos].split(str_separador)
-        
-        #Exclui o '\n' do ultimo campo
-        vet_campos[-1] = vet_campos[-1].replace("\n","")
+    vet_arquivo = abre_planilha(str_nome_arquivo, str_nome_planilha)
+    for vet_campos in vet_arquivo:
+        insere_registro_no_banco(str_tabela, vet_schema, vet_campos[:6])
 
-        # Quando se trata da tabela de ocorrencias, converte a data em TEXT 
-        # como ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS") e substitui os 
-        # pontos e vírgulas dos valores
-        if str_tabela == "tb_ocorrencias":
-            vet_campos[0] = string_data_em_iso8601(vet_campos[0])
-            vet_campos[4] = vet_campos[4].replace(".","").replace(",",".")
-
-        insere_registro_no_banco(str_tabela, vet_schema, vet_campos)
+    return
 
 
 def cria_tabela(str_tabela, vet_campos, vet_tipos=[]):
@@ -474,11 +523,12 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
 
     while True:
         system("clear") or None
-        print(str_titulo, end="")
+        # print(str_titulo, end="")
+        print(str_titulo)
         print(str_conteudo)
         str_escolha = input("\nDigite a opção (que está entre parêntesis): ").upper()
 
-        if not str_escolha in dic_opcoes.keys() :
+        if not str_escolha in dic_opcoes.keys():
             #A opção digitada não consta do rol de opções da tela em questão
             print("\nA opção digitada '{}' não está prevista!".format(str_escolha))
             sleep(2)
@@ -506,11 +556,13 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
 
             elif dic_opcoes[str_escolha] == "menu_iniciar_configuracoes":
                 str_configuracoes  = "Configurações:\n\n"
-                str_configuracoes += "(I)mportar .csv\n"
-                str_configuracoes += "(E)xportar .csv\n"
+                str_configuracoes += "(I)mportar Planilha\n"
+                str_configuracoes += "(E)xportar Planilha\n"
                 str_configuracoes += "E(x)cluir backups\n"
                 str_configuracoes += "(C)ontas e sub-contas\n"
                 str_configuracoes += "(V)oltar\n"
+
+                # TODO: Montar valores possíveis das telas um json que se converte em dictionary
 
                 monta_tela(str_configuracoes, {   "I": "configuracoes_importar"
                                                 , "E": "configuracoes_exportar"
@@ -519,15 +571,17 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
                                                 , "V": "voltar"})
 
             elif dic_opcoes[str_escolha] == "configuracoes_importar":
-                # TODO: Alterar para relacionar os arquivos disponíveis e 
-                # permitir que o usuário escolha
+                # TODO: Alterar para relacionar os arquivos disponíveis/abas e permitir que o usuário escolha
+                str_nome_arquivo = "Fluxo.xlsx"
+                str_nome_planilha = "Fluxo"
+                vet_schema = ["Data",
+                              "Oque",
+                              "Detalhe",
+                              "SubConta",
+                              "Valor",
+                              "Situacao"]
 
-                importa_csv("ocorrencias.csv", "tb_ocorrencias", [  "Data", 
-                                                                    "Oque", 
-                                                                    "Detalhe", 
-                                                                    "SubConta", 
-                                                                    "Valor", 
-                                                                    "Situacao"])
+                importa_dados_planilha(str_nome_arquivo, str_nome_planilha, "tb_ocorrencias", vet_schema)
 
             elif dic_opcoes[str_escolha] == "voltar":
                 break
@@ -581,7 +635,7 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
                                                     , "V": "voltar"}, "Contas e sub-contas:\n\n")
 
             else:
-                #TODO: Avaliar se depois de todas as opções implementadas,  é meso necessário manter este else
+                #TODO: Avaliar se depois de todas as opções implementadas, é meso necessário manter este else
                 print("\nFuncionalidade '{} - {}' ainda não implementada".format(str_escolha, dic_opcoes[str_escolha]))
                 sleep(2)
 
