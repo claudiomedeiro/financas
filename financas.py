@@ -19,12 +19,14 @@ from datetime import datetime
 from sqlite3 import connect, Error
 from math import sqrt
 from sys import exit
+from json import load
 import xlrd         # para manipular planilhas excel
 
 str_banco = "financas.db"
 str_separador = ";"
 dic_paginas = {}
 dic_larguras = {"SubConta": 0, "Oque": 0, "Valor": 0, "Detalhe": 0}
+dic_configuracoes = {}
 
 # As listas de apenas 01 elemento convertidas em tuplas, acrescentam uma 
 # vírgula que não é tolerada no comando 'SELECT', então fiz uma brincadeira 
@@ -32,9 +34,53 @@ dic_larguras = {"SubConta": 0, "Oque": 0, "Valor": 0, "Detalhe": 0}
 proporcao_aurea = "proporcao_aurea {}".format((1+sqrt(5))/2)
 
 # TODO: Colocar no arquivo de configurações e pensar funcionalidade para 
-# alterar pelo usuário. Pensar também em não permitir a definição do mínimo 
-# menor que a maior quantidade ṕara um dia/situação
+#  alterar pelo usuário. Pensar também em não permitir a definição do mínimo
+#  menor que a maior quantidade ṕara um dia/situação
 int_ocorrencias_por_pagina = 10
+
+
+def configura_tela_montar(str_tela, int_pagina=0, str_conteudo=""):
+    str_titulo = dic_configuracoes[str_tela]["título"] + "\n"
+    dic_opcoes_passar_adiante = {}
+    str_configuracoes = str_conteudo + "\n"
+    for str_opcao in dic_configuracoes[str_tela]["opções"].keys():
+        str_configuracoes += dic_configuracoes[str_tela]["opções"][str_opcao][0] + "\n"
+        dic_opcoes_passar_adiante[str_opcao] = dic_configuracoes[str_tela]["opções"][str_opcao][1]
+
+    monta_tela(str_configuracoes, dic_opcoes_passar_adiante, str_titulo, int_pagina=int_pagina)
+    return
+
+
+def abre_json(str_arquivo):
+    """
+    TODO: Documentar método
+    """
+    dic_arquivo = {}
+    try:
+        with open(str_arquivo, 'r') as fil_arquivo:
+            dic_arquivo = load(fil_arquivo)
+            fil_arquivo.close()
+    except IOError:
+        grava_log(("ERRO", "'" + str_arquivo + "' nao existe "))
+        pass
+
+    return dic_arquivo
+
+
+def tela_inserir_nova_ocorrencia(str_data="", str_oque="", str_detalhe="", str_subconta="", flo_valor="", str_situacao=""):
+    """
+    str_data, str_oque, str_detalhe, str_subconta, flo_valor, str_situacao
+    """
+    global dic_configuracoes
+    # limpa a tela
+    # exibe o cabeçalho
+    # loop pelo formulário que pede os valores
+    # exibe as opções
+
+    monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0)
+
+
+    insere_registro_no_banco(str_tabela, vet_campos, vet_valores)
 
 
 def monta_paginas_extrato():
@@ -330,27 +376,27 @@ def abre_planilha(str_arquivo, str_aba):
     return(vet_linhas)
 
 
-def abre_arquivo(str_arquivo):
-    """Recebe o nome do arquivo, abre-o, e coloca em um vetor em que cada
-    posição é uma linha.
-
-    Retorna no vetor e o último elemento tem um '\n' que depois precisa ser
-    tirado em cada processo específico.
-    """
-
-    str_arquivo = str(str_arquivo)
-    vet_linhas = []
-
-    try:
-        with open(str_arquivo, 'r') as fil_arquivo:
-            vet_linhas = fil_arquivo.readlines()
-            fil_arquivo.close()
-
-    except IOError:
-        grava_log(("ERRO", "Problemas ao tentar ler o arquivo '" + str_arquivo + "'"))
-
-    print("def abre_arquivo vet_linhas: {}".format(vet_linhas))
-    return vet_linhas
+# def abre_arquivo(str_arquivo):
+#     """Recebe o nome do arquivo, abre-o, e coloca em um vetor em que cada
+#     posição é uma linha.
+#
+#     Retorna no vetor e o último elemento tem um '\n' que depois precisa ser
+#     tirado em cada processo específico.
+#     """
+#
+#     str_arquivo = str(str_arquivo)
+#     vet_linhas = []
+#
+#     try:
+#         with open(str_arquivo, 'r') as fil_arquivo:
+#             vet_linhas = fil_arquivo.readlines()
+#             fil_arquivo.close()
+#
+#     except IOError:
+#         grava_log(("ERRO", "Problemas ao tentar ler o arquivo '" + str_arquivo + "'"))
+#
+#     print("def abre_arquivo vet_linhas: {}".format(vet_linhas))
+#     return vet_linhas
 
 
 def grava_log(tup_log, bol_parar=False):
@@ -470,6 +516,7 @@ def insere_registro_no_banco(str_tabela, vet_campos, vet_valores):
     executa_comando_banco(str_comando, str_mensagem_ok, str_mensagem_erro)
     return
 
+
 def executa_consulta(str_comando):
     """Recebe um comando SQL de consulta e o nome do banco, executa e retorna um vetor com os valores encontrados
     """  
@@ -520,11 +567,11 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
     - dic_opcoes: as teclas aceitas na inteface (S)air, (V)oltar, etc
     - str_titulo: preenchido quando o título precisar ficar separado das opções
     """
+    global dic_configuracoes
 
     while True:
         system("clear") or None
-        # print(str_titulo, end="")
-        print(str_titulo)
+        print(str_titulo, end="")
         print(str_conteudo)
         str_escolha = input("\nDigite a opção (que está entre parêntesis): ").upper()
 
@@ -551,24 +598,11 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
                 sleep(2)
                 exit()
 
-            elif dic_opcoes[str_escolha] == "voltar_extrato":
-                menu_iniciar()
+            elif dic_opcoes[str_escolha] == "menu_inicial":
+                configura_tela_montar(dic_opcoes[str_escolha])
 
             elif dic_opcoes[str_escolha] == "menu_iniciar_configuracoes":
-                str_configuracoes  = "Configurações:\n\n"
-                str_configuracoes += "(I)mportar Planilha\n"
-                str_configuracoes += "(E)xportar Planilha\n"
-                str_configuracoes += "E(x)cluir backups\n"
-                str_configuracoes += "(C)ontas e sub-contas\n"
-                str_configuracoes += "(V)oltar\n"
-
-                # TODO: Montar valores possíveis das telas um json que se converte em dictionary
-
-                monta_tela(str_configuracoes, {   "I": "configuracoes_importar"
-                                                , "E": "configuracoes_exportar"
-                                                , "X": "configuracoes_excluir_backups"
-                                                , "C": "configuracoes_contas_e_subcontas"
-                                                , "V": "voltar"})
+                configura_tela_montar(dic_opcoes[str_escolha])
 
             elif dic_opcoes[str_escolha] == "configuracoes_importar":
                 # TODO: Alterar para relacionar os arquivos disponíveis/abas e permitir que o usuário escolha
@@ -592,64 +626,54 @@ def monta_tela(str_conteudo="", dic_opcoes={}, str_titulo="", int_pagina=0):
                     monta_paginas_extrato()
                     int_pagina += 1
 
-                dic_opcoes_proximo = {"A": "extrato_menos_1"
-                                    , "P": "extrato_mais_1"
-                                    , "E": "extrato_editar_ocorrencia"
-                                    , "I": "inserir_ocorrencia"
-                                    , "V": "voltar_extrato"}
+                # dic_opcoes_proximo = {"A": "extrato_menos_1"
+                #                     , "P": "extrato_mais_1"
+                #                     , "E": "extrato_editar_ocorrencia"
+                #                     , "I": "inserir_ocorrencia"
+                #                     , "V": "menu_inicial"}
 
                 if int_pagina > 0:
                     str_extrato = carrega_extrato(int_pagina)
 
-                str_extrato += "\n\n"
+                # TODO: Repensar os 02 blocos a seguir, dentro da nova lógica de montagem padronizada
+                # str_extrato += "\n\n"
+                # # Só exibe a opção se tiver páginas antes
+                # if int_pagina > 1:
+                #     str_extrato += "Página (A)nterior\n"
+                # else:
+                #     dic_opcoes_proximo.pop("A")
+                #
+                # # Só exibe a opção se tiver páginas depois
+                # if int_pagina < len(dic_paginas.keys()):
+                #     str_extrato += "(P)róxima Página\n"
+                # else:
+                #     dic_opcoes_proximo.pop("P")
+                #
 
-                # Só exibe a opção se tiver páginas antes
-                if int_pagina > 1:
-                    str_extrato += "Página (A)nterior\n"
+                configura_tela_montar(dic_opcoes[str_escolha], int_pagina=int_pagina, str_conteudo=str_extrato)
 
-                else:
-                    dic_opcoes_proximo.pop("A")
+                # str_extrato += "(E)ditar ocorrência\n"  #TODO: Só quando tiverem ocorrências sendo exibidas
+                # str_extrato += "(I)nserir\n"
+                # str_extrato += "(V)oltar\n"
 
-                # Só exibe a opção se tiver páginas depois
-                if int_pagina < len(dic_paginas.keys()):
-                    str_extrato += "(P)róxima Página\n"
 
-                else:
-                    dic_opcoes_proximo.pop("P")
-
-                str_extrato += "(E)ditar ocorrência\n"  #TODO: Só quando tiverem ocorrências sendo exibidas
-                str_extrato += "(I)nserir\n"
-                str_extrato += "(V)oltar\n"
-
-                monta_tela(str_extrato, dic_opcoes_proximo, "Extrato: {}\n".format(dic_paginas[int_pagina]["Situacao"]), int_pagina)
+                # monta_tela(str_extrato, dic_opcoes_proximo,
+                #            "Extrato: {}\n".format(dic_paginas[int_pagina]["Situacao"]), int_pagina)
 
             elif dic_opcoes[str_escolha] == "configuracoes_contas_e_subcontas":
                 #TODO: montar relação de contas e sub-contas
-
-                str_contas_e_subcontas  = "(E)ditar sub-conta\n"    #TODO: Só quando tiverem contas/sub-contas
-                str_contas_e_subcontas += "(A)crescentar sub-conta\n"
-                str_contas_e_subcontas += "(V)oltar\n"
-
-                monta_tela(str_contas_e_subcontas, {  "E": "contas_e_subcontas_editar"
-                                                    , "A": "contas_e_subcontas_acrescentar"
-                                                    , "V": "voltar"}, "Contas e sub-contas:\n\n")
-
+                configura_tela_montar(dic_opcoes[str_escolha])
             else:
-                #TODO: Avaliar se depois de todas as opções implementadas, é meso necessário manter este else
+                #TODO: Avaliar se depois de todas as opções implementadas, é mesmo necessário manter este else
                 print("\nFuncionalidade '{} - {}' ainda não implementada".format(str_escolha, dic_opcoes[str_escolha]))
                 sleep(2)
 
 
-def menu_iniciar():
-    str_menu_inicial  = "Menu Inicial:\n\n"
-    str_menu_inicial += "(C)onfigurações\n"
-    str_menu_inicial += "(E)xtrato\n"
-    str_menu_inicial += "(I)nserir\n"
-    str_menu_inicial += "(S)air\n"
-    monta_tela(str_menu_inicial, {    "C": "menu_iniciar_configuracoes"
-                                    , "E": "extrato"
-                                    , "I": "inserir_ocorrencia"
-                                    , "S": "sair"})
+def main():
+    global dic_configuracoes
+    dic_configuracoes = abre_json("configuracoes.json")
+    configura_tela_montar("menu_inicial")
+
 
 if __name__ == "__main__":
-    menu_iniciar()
+    main()

@@ -1,0 +1,54 @@
+{
+  "tela": {
+    "título": "Texto que aparece no topo",
+    "opções": {
+      "L": ["(L)etra menu opção", "tela_opcao_correspondente_l"],
+      "E": ["L(e)tra menu opção", "tela_opcao_correspondente_e"]
+    }
+  },
+
+  "menu_iniciar_configuracoes": {
+    "título": "Configurações",
+    "opções": {
+      "I": ["(I)mportar Planilha", "configuracoes_importar"],
+      "E": ["(E)xportar Planilha", "configuracoes_exportar"],
+      "X": ["E(x)cluir backups", "configuracoes_excluir_backups"],
+      "C": ["(C)ontas e sub-contas", "configuracoes_contas_e_subcontas"],
+      "V": ["(V)oltar", "voltar"]
+    }
+  },
+
+  "configuracoes_contas_e_subcontas": {
+    "título": "Contas e sub-contas",
+    "opções": {
+      "E": ["(E)ditar sub-conta", "contas_e_subcontas_editar"],
+      "A": ["(A)crescentar sub-conta", "contas_e_subcontas_acrescentar"],
+      "V": ["(V)oltar", "voltar"]
+    }
+  },
+
+
+  "menu_inicial": {
+    "título": "Menu Inicial",
+    "opções": {
+      "C": ["(C)onfigurações", "menu_iniciar_configuracoes"],
+      "E": ["(E)xtrato", "extrato"],
+      "I": ["(I)nserir", "inserir_ocorrencia"],
+      "S": ["(S)air", "sair"]
+    }
+  },
+
+
+  "extrato": {
+    "título": "Extrato",
+    "opções": {
+      "A": ["Página (A)nterior", "extrato_menos_1"],
+      "P": ["(P)róxima Página", "extrato_mais_1"],
+      "E": ["(E)ditar ocorrência", "extrato_editar_ocorrencia"],
+      "I": ["(I)nserir", "inserir_ocorrencia"],
+      "V": ["(V)oltar", "menu_inicial"]
+    }
+  }
+
+}
+
